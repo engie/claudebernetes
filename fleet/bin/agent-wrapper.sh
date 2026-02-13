@@ -5,15 +5,20 @@ HOSTNAME=$(hostname)
 NODE_DIR="/var/mnt/fleet/nodes/$HOSTNAME"
 
 while true; do
-  # Update heartbeat
   echo "{\"status\":\"starting\",\"ts\":\"$(date -Iseconds)\"}" > "$NODE_DIR/heartbeat.json"
 
-  # Run one Claude session
-  # Permissions are configured via settings.json in $HOME/.claude/
+  # Run a long-lived Claude session.
+  # Claude is responsible for its own event loop — polling IRC,
+  # updating heartbeats, sleeping between checks. Sessions should
+  # run indefinitely until context pressure forces an exit.
   /var/mnt/fleet/bin/claude \
-    -p "You are Claudebernetes node $HOSTNAME. Read CLAUDE.md for your instructions. This is a new session — check IRC and cluster state, then act." \
+    -p "You are Claudebernetes node $HOSTNAME. Read CLAUDE.md for your full instructions, then enter your event loop." \
+    --max-turns 200 \
     2>> "$NODE_DIR/claude-stderr.log"
 
   echo "{\"status\":\"restarting\",\"ts\":\"$(date -Iseconds)\"}" > "$NODE_DIR/heartbeat.json"
-  sleep 30
+
+  # Brief pause before restarting — session exited due to context
+  # limits or an error, not because the loop design wants it to.
+  sleep 5
 done
