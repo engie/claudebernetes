@@ -31,8 +31,8 @@ storage:
 
 systemd:
   units:
-    # SMB mount for /mnt/fleet
-    - name: mnt-fleet.mount
+    # SMB mount for /var/mnt/fleet (FCOS: /mnt → /var/mnt)
+    - name: var-mnt-fleet.mount
       enabled: true
       contents: |
         [Unit]
@@ -42,7 +42,7 @@ systemd:
 
         [Mount]
         What=//${SMB_SERVER}/${SMB_SHARE}
-        Where=/mnt/fleet
+        Where=/var/mnt/fleet
         Type=cifs
         Options=credentials=/etc/samba/fleet-credentials,uid=1000,gid=1000,vers=3.0,_netdev
 
@@ -55,20 +55,20 @@ systemd:
       contents: |
         [Unit]
         Description=Initialize Claudebernetes node directory
-        After=mnt-fleet.mount
-        Requires=mnt-fleet.mount
-        ConditionPathExists=!/mnt/fleet/nodes/%H/.claude
+        After=var-mnt-fleet.mount
+        Requires=var-mnt-fleet.mount
+        ConditionPathExists=!/var/mnt/fleet/nodes/%H/.claude
 
         [Service]
         Type=oneshot
         RemainAfterExit=yes
         User=core
         ExecStart=/bin/bash -c '\
-          mkdir -p /mnt/fleet/nodes/%H/.claude && \
-          ln -sf ../../auth/.credentials.json /mnt/fleet/nodes/%H/.claude/.credentials.json && \
-          ln -sf ../../auth/settings.json /mnt/fleet/nodes/%H/.claude/settings.json && \
-          test -p /mnt/fleet/nodes/%H/irc.pipe || mkfifo /mnt/fleet/nodes/%H/irc.pipe && \
-          echo "{\"status\":\"booted\",\"ts\":\"$(date -Iseconds)\"}" > /mnt/fleet/nodes/%H/heartbeat.json'
+          mkdir -p /var/mnt/fleet/nodes/%H/.claude && \
+          ln -sf ../../auth/.credentials.json /var/mnt/fleet/nodes/%H/.claude/.credentials.json && \
+          ln -sf ../../auth/settings.json /var/mnt/fleet/nodes/%H/.claude/settings.json && \
+          test -p /var/mnt/fleet/nodes/%H/irc.pipe || mkfifo /var/mnt/fleet/nodes/%H/irc.pipe && \
+          echo "{\"status\":\"booted\",\"ts\":\"$(date -Iseconds)\"}" > /var/mnt/fleet/nodes/%H/heartbeat.json'
 
         [Install]
         WantedBy=multi-user.target
@@ -79,15 +79,15 @@ systemd:
       contents: |
         [Unit]
         Description=Claudebernetes IRC sidecar
-        After=claudebernetes-init.service mnt-fleet.mount
-        Requires=mnt-fleet.mount
+        After=claudebernetes-init.service var-mnt-fleet.mount
+        Requires=var-mnt-fleet.mount
         Wants=claudebernetes-init.service
 
         [Service]
         Type=simple
         User=core
         EnvironmentFile=/etc/claudebernetes/irc.env
-        ExecStart=/mnt/fleet/bin/irc-bot.sh
+        ExecStart=/var/mnt/fleet/bin/irc-bot.sh
         Restart=always
         RestartSec=10s
 
@@ -100,16 +100,16 @@ systemd:
       contents: |
         [Unit]
         Description=Claudebernetes agent daemon
-        After=claudebernetes-init.service claudebernetes-irc.service mnt-fleet.mount
-        Requires=mnt-fleet.mount
+        After=claudebernetes-init.service claudebernetes-irc.service var-mnt-fleet.mount
+        Requires=var-mnt-fleet.mount
         Wants=claudebernetes-init.service claudebernetes-irc.service
 
         [Service]
         Type=simple
         User=core
-        Environment=HOME=/mnt/fleet/nodes/%H
-        WorkingDirectory=/mnt/fleet
-        ExecStart=/mnt/fleet/bin/agent-wrapper.sh
+        Environment=HOME=/var/mnt/fleet/nodes/%H
+        WorkingDirectory=/var/mnt/fleet
+        ExecStart=/var/mnt/fleet/bin/agent-wrapper.sh
         Restart=always
         RestartSec=30s
 

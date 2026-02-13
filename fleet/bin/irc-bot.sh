@@ -6,7 +6,7 @@ IRC_PORT="${IRC_PORT:-6667}"
 IRC_PASSWORD="${IRC_PASSWORD:-}"
 IRC_CHANNEL="#fleet"
 NICK=$(hostname)
-NODE_DIR="/mnt/fleet/nodes/$NICK"
+NODE_DIR="/var/mnt/fleet/nodes/$NICK"
 LOG_FILE="$NODE_DIR/irc.log"
 PIPE_FILE="$NODE_DIR/irc.pipe"
 
