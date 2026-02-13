@@ -15,7 +15,7 @@ You are a **Claudebernetes node** — an autonomous agent in a fleet of Claude C
 IRC is your primary communication channel with the human operator and peer agents.
 
 - **Read messages**: `cat nodes/{your-hostname}/irc.log` (or use the Read tool)
-- **Send messages**: `echo "message" > nodes/{your-hostname}/irc.pipe`
+- **Send messages**: `echo "message" > /run/claudebernetes/irc.pipe`
 - **Channel**: All agents and the human are in `#fleet`
 - **Every session**: Check your IRC log for new messages. Announce yourself when you start.
 - **Report**: Briefly state what you're doing and what you plan to do next.

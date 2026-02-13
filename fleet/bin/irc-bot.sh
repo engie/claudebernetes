@@ -8,7 +8,7 @@ IRC_CHANNEL="#fleet"
 NICK=$(hostname)
 NODE_DIR="/var/mnt/fleet/nodes/$NICK"
 LOG_FILE="$NODE_DIR/irc.log"
-PIPE_FILE="$NODE_DIR/irc.pipe"
+PIPE_FILE="/run/claudebernetes/irc.pipe"
 
 log() {
   echo "[$(date -Iseconds)] $*" >> "$LOG_FILE"

@@ -50,6 +50,9 @@ systemd:
         WantedBy=multi-user.target
 
     # Node init — runs once at boot before the agent starts
+    # SMB doesn't support symlinks or FIFOs, so:
+    #   - credentials are copied (not symlinked) to the node's .claude/
+    #   - the IRC named pipe lives on local tmpfs at /run/claudebernetes/
     - name: claudebernetes-init.service
       enabled: true
       contents: |
@@ -57,7 +60,6 @@ systemd:
         Description=Initialize Claudebernetes node directory
         After=var-mnt-fleet.mount
         Requires=var-mnt-fleet.mount
-        ConditionPathExists=!/var/mnt/fleet/nodes/%H/.claude
 
         [Service]
         Type=oneshot
@@ -65,9 +67,10 @@ systemd:
         User=core
         ExecStart=/bin/bash -c '\
           mkdir -p /var/mnt/fleet/nodes/%H/.claude && \
-          ln -sf ../../auth/.credentials.json /var/mnt/fleet/nodes/%H/.claude/.credentials.json && \
-          ln -sf ../../auth/settings.json /var/mnt/fleet/nodes/%H/.claude/settings.json && \
-          test -p /var/mnt/fleet/nodes/%H/irc.pipe || mkfifo /var/mnt/fleet/nodes/%H/irc.pipe && \
+          cp /var/mnt/fleet/auth/.credentials.json /var/mnt/fleet/nodes/%H/.claude/.credentials.json && \
+          cp /var/mnt/fleet/auth/settings.json /var/mnt/fleet/nodes/%H/.claude/settings.json && \
+          mkdir -p /run/claudebernetes && \
+          mkfifo /run/claudebernetes/irc.pipe && \
           echo "{\"status\":\"booted\",\"ts\":\"$(date -Iseconds)\"}" > /var/mnt/fleet/nodes/%H/heartbeat.json'
 
         [Install]
