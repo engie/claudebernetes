@@ -42,8 +42,9 @@ else
 fi
 
 # Write settings (dangerously-skip-permissions equivalent)
-cat > "$FLEET_DIR/auth/settings.json" << 'EOF'
+cat > "$FLEET_DIR/auth/settings.json" << EOF
 {
+  "model": "${CLAUDE_MODEL:-sonnet}",
   "permissions": {
     "allow": ["Bash(*)", "Read(*)", "Write(*)", "Edit(*)", "Glob(*)", "Grep(*)", "WebFetch(*)", "WebSearch(*)"],
     "deny": []
