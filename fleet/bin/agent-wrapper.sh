@@ -9,8 +9,8 @@ while true; do
   echo "{\"status\":\"starting\",\"ts\":\"$(date -Iseconds)\"}" > "$NODE_DIR/heartbeat.json"
 
   # Run one Claude session
+  # Permissions are configured via settings.json in $HOME/.claude/
   /var/mnt/fleet/bin/claude \
-    --dangerously-skip-permissions \
     -p "You are Claudebernetes node $HOSTNAME. Read CLAUDE.md for your instructions. This is a new session — check IRC and cluster state, then act." \
     2>> "$NODE_DIR/claude-stderr.log"
 
