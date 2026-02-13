@@ -44,7 +44,7 @@ systemd:
         What=//${SMB_SERVER}/${SMB_SHARE}
         Where=/var/mnt/fleet
         Type=cifs
-        Options=credentials=/etc/samba/fleet-credentials,vers=3.0,_netdev
+        Options=credentials=/etc/samba/fleet-credentials,vers=3.0,cache=none,_netdev
 
         [Install]
         WantedBy=multi-user.target
