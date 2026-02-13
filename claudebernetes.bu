@@ -88,7 +88,7 @@ systemd:
         [Service]
         Type=simple
         EnvironmentFile=/etc/claudebernetes/irc.env
-        ExecStart=/var/mnt/fleet/bin/irc-bot.sh
+        ExecStart=/bin/bash /var/mnt/fleet/bin/irc-bot.sh
         Restart=always
         RestartSec=10s
 
@@ -109,7 +109,7 @@ systemd:
         Type=simple
         Environment=HOME=/var/mnt/fleet/nodes/%H
         WorkingDirectory=/var/mnt/fleet
-        ExecStart=/var/mnt/fleet/bin/agent-wrapper.sh
+        ExecStart=/bin/bash /var/mnt/fleet/bin/agent-wrapper.sh
         Restart=always
         RestartSec=30s
 
