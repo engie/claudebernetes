@@ -1,0 +1,9 @@
+*.ign
+site.env
+smb_mount.config
+fleet/auth/
+fleet/bin/claude
+fleet/nodes/
+fleet/workloads/
+fleet/decisions/
+fleet/hello_world.txt
