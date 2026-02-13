@@ -65,11 +65,11 @@ systemd:
         Type=oneshot
         RemainAfterExit=yes
         User=core
+        RuntimeDirectory=claudebernetes
         ExecStart=/bin/bash -c '\
           mkdir -p /var/mnt/fleet/nodes/%H/.claude && \
           cp /var/mnt/fleet/auth/.credentials.json /var/mnt/fleet/nodes/%H/.claude/.credentials.json && \
           cp /var/mnt/fleet/auth/settings.json /var/mnt/fleet/nodes/%H/.claude/settings.json && \
-          mkdir -p /run/claudebernetes && \
           mkfifo /run/claudebernetes/irc.pipe && \
           echo "{\"status\":\"booted\",\"ts\":\"$(date -Iseconds)\"}" > /var/mnt/fleet/nodes/%H/heartbeat.json'
 
