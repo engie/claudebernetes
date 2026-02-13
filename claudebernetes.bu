@@ -44,7 +44,7 @@ systemd:
         What=//${SMB_SERVER}/${SMB_SHARE}
         Where=/var/mnt/fleet
         Type=cifs
-        Options=credentials=/etc/samba/fleet-credentials,uid=1000,gid=1000,vers=3.0,_netdev
+        Options=credentials=/etc/samba/fleet-credentials,vers=3.0,_netdev
 
         [Install]
         WantedBy=multi-user.target
@@ -64,12 +64,11 @@ systemd:
         [Service]
         Type=oneshot
         RemainAfterExit=yes
-        User=core
-        RuntimeDirectory=claudebernetes
         ExecStart=/bin/bash -c '\
           mkdir -p /var/mnt/fleet/nodes/%H/.claude && \
           cp /var/mnt/fleet/auth/.credentials.json /var/mnt/fleet/nodes/%H/.claude/.credentials.json && \
           cp /var/mnt/fleet/auth/settings.json /var/mnt/fleet/nodes/%H/.claude/settings.json && \
+          mkdir -p /run/claudebernetes && \
           mkfifo /run/claudebernetes/irc.pipe && \
           echo "{\"status\":\"booted\",\"ts\":\"$(date -Iseconds)\"}" > /var/mnt/fleet/nodes/%H/heartbeat.json'
 
@@ -88,7 +87,6 @@ systemd:
 
         [Service]
         Type=simple
-        User=core
         EnvironmentFile=/etc/claudebernetes/irc.env
         ExecStart=/var/mnt/fleet/bin/irc-bot.sh
         Restart=always
@@ -109,7 +107,6 @@ systemd:
 
         [Service]
         Type=simple
-        User=core
         Environment=HOME=/var/mnt/fleet/nodes/%H
         WorkingDirectory=/var/mnt/fleet
         ExecStart=/var/mnt/fleet/bin/agent-wrapper.sh
