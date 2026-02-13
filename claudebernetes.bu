@@ -1,0 +1,117 @@
+variant: fcos
+version: 1.6.0
+
+passwd:
+  users:
+    - name: core
+      ssh_authorized_keys:
+        - ${SSH_PUBKEY}
+
+storage:
+  directories:
+    - path: /etc/samba
+
+  files:
+    # SMB credentials for Hetzner Storage Box
+    - path: /etc/samba/fleet-credentials
+      mode: 0600
+      contents:
+        inline: |
+          username=${SMB_USERNAME}
+          password=${SMB_PASSWORD}
+
+    # IRC config for the sidecar
+    - path: /etc/claudebernetes/irc.env
+      mode: 0644
+      contents:
+        inline: |
+          IRC_SERVER=${IRC_SERVER}
+          IRC_PORT=${IRC_PORT}
+          IRC_PASSWORD=${IRC_PASSWORD}
+
+systemd:
+  units:
+    # SMB mount for /mnt/fleet
+    - name: mnt-fleet.mount
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Mount fleet SMB share
+        After=network-online.target
+        Wants=network-online.target
+
+        [Mount]
+        What=//${SMB_SERVER}/${SMB_SHARE}
+        Where=/mnt/fleet
+        Type=cifs
+        Options=credentials=/etc/samba/fleet-credentials,uid=1000,gid=1000,vers=3.0,_netdev
+
+        [Install]
+        WantedBy=multi-user.target
+
+    # Node init — runs once at boot before the agent starts
+    - name: claudebernetes-init.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Initialize Claudebernetes node directory
+        After=mnt-fleet.mount
+        Requires=mnt-fleet.mount
+        ConditionPathExists=!/mnt/fleet/nodes/%H/.claude
+
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        User=core
+        ExecStart=/bin/bash -c '\
+          mkdir -p /mnt/fleet/nodes/%H/.claude && \
+          ln -sf ../../auth/.credentials.json /mnt/fleet/nodes/%H/.claude/.credentials.json && \
+          ln -sf ../../auth/settings.json /mnt/fleet/nodes/%H/.claude/settings.json && \
+          test -p /mnt/fleet/nodes/%H/irc.pipe || mkfifo /mnt/fleet/nodes/%H/irc.pipe && \
+          echo "{\"status\":\"booted\",\"ts\":\"$(date -Iseconds)\"}" > /mnt/fleet/nodes/%H/heartbeat.json'
+
+        [Install]
+        WantedBy=multi-user.target
+
+    # IRC sidecar — persistent IRC connection
+    - name: claudebernetes-irc.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Claudebernetes IRC sidecar
+        After=claudebernetes-init.service mnt-fleet.mount
+        Requires=mnt-fleet.mount
+        Wants=claudebernetes-init.service
+
+        [Service]
+        Type=simple
+        User=core
+        EnvironmentFile=/etc/claudebernetes/irc.env
+        ExecStart=/mnt/fleet/bin/irc-bot.sh
+        Restart=always
+        RestartSec=10s
+
+        [Install]
+        WantedBy=multi-user.target
+
+    # Agent daemon — runs Claude Code in a loop
+    - name: claudebernetes-agent.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Claudebernetes agent daemon
+        After=claudebernetes-init.service claudebernetes-irc.service mnt-fleet.mount
+        Requires=mnt-fleet.mount
+        Wants=claudebernetes-init.service claudebernetes-irc.service
+
+        [Service]
+        Type=simple
+        User=core
+        Environment=HOME=/mnt/fleet/nodes/%H
+        WorkingDirectory=/mnt/fleet
+        ExecStart=/mnt/fleet/bin/agent-wrapper.sh
+        Restart=always
+        RestartSec=30s
+
+        [Install]
+        WantedBy=multi-user.target
