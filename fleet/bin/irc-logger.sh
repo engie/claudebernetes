@@ -1,49 +1,48 @@
 #!/bin/bash
 set -uo pipefail
 
-IRC_SERVER="${IRC_SERVER:?IRC_SERVER not set}"
+# Centralized IRC channel logger
+# Connects to InspIRCd and appends all channel activity to a shared log file.
+# Runs on the IRC server host (tailstuff), not on fleet nodes.
+
+IRC_SERVER="${IRC_SERVER:-127.0.0.1}"
 IRC_PORT="${IRC_PORT:-6667}"
 IRC_PASSWORD="${IRC_PASSWORD:-}"
 IRC_CHANNEL="#fleet"
-NICK=$(hostname)
-PIPE_FILE="/run/claudebernetes/irc.pipe"
-RECV_PIPE="/run/claudebernetes/irc-recv.pipe"
+NICK="logger"
+LOG_DIR="${LOG_DIR:?LOG_DIR not set}"
+LOG_FILE="$LOG_DIR/channel.log"
+
+mkdir -p "$LOG_DIR"
+
+log_event() {
+  echo "[$(date -Iseconds)] $*" >> "$LOG_FILE"
+}
 
 connect() {
-  # Open TCP connection to IRC server
   exec 3<>/dev/tcp/"$IRC_SERVER"/"$IRC_PORT"
 
-  # Open receive FIFO read-write (prevents blocking when no reader)
-  exec 4<>"$RECV_PIPE"
-
-  # Authenticate if password set
   if [[ -n "$IRC_PASSWORD" ]]; then
     echo "PASS $IRC_PASSWORD" >&3
   fi
 
-  # Register
   echo "NICK $NICK" >&3
-  echo "USER $NICK 0 * :Claudebernetes node $NICK" >&3
+  echo "USER $NICK 0 * :Claudebernetes channel logger" >&3
 
-  # Wait for welcome (001) before joining
   while IFS= read -r -t 300 line <&3; do
     line="${line%%$'\r'}"
     echo "<<< $line" >&2
 
-    # Handle PING during registration
     if [[ "$line" == PING* ]]; then
       local token="${line#PING }"
       echo "PONG $token" >&3
     fi
 
-    # 001 = RPL_WELCOME
     if [[ "$line" == *" 001 "* ]]; then
       break
     fi
 
-    # Handle errors
     if [[ "$line" == *" 433 "* ]]; then
-      # Nick already in use — append PID
       NICK="${NICK}-$$"
       echo "NICK $NICK" >&3
       echo "Nick collision, retrying as $NICK" >&2
@@ -54,56 +53,48 @@ connect() {
   echo "Joined $IRC_CHANNEL as $NICK" >&2
 }
 
-send_message() {
-  local msg="$1"
-  echo "PRIVMSG $IRC_CHANNEL :$msg" >&3
-  echo ">>> $msg" >&2
-}
-
-# Main loop with reconnection
 while true; do
   echo "Connecting to $IRC_SERVER:$IRC_PORT..." >&2
   connect
 
-  # Start background reader for the outgoing named pipe (agent → IRC)
-  (
-    while true; do
-      if IFS= read -r msg < "$PIPE_FILE"; then
-        if [[ -n "$msg" ]]; then
-          echo "PRIVMSG $IRC_CHANNEL :$msg" >&3
-          echo ">>> $msg" >&2
-        fi
-      fi
-    done
-  ) &
-  PIPE_PID=$!
-
-  # Read from IRC
   while IFS= read -r -t 300 line <&3; do
     line="${line%%$'\r'}"
 
-    # Handle PING/PONG keepalive
     if [[ "$line" == PING* ]]; then
       token="${line#PING }"
       echo "PONG $token" >&3
       continue
     fi
 
-    # Deliver channel messages to agent via receive FIFO
+    # Channel messages: :sender!user@host PRIVMSG #channel :message
     if [[ "$line" == *"PRIVMSG $IRC_CHANNEL"* ]]; then
       sender="${line%%!*}"
       sender="${sender#:}"
       msg="${line#*PRIVMSG $IRC_CHANNEL :}"
-      echo "<$sender> $msg" >&4
-    else
-      echo "<<< $line" >&2
+      log_event "<$sender> $msg"
+
+    # JOIN: :sender!user@host JOIN #channel
+    elif [[ "$line" == *"JOIN"*"$IRC_CHANNEL"* ]]; then
+      sender="${line%%!*}"
+      sender="${sender#:}"
+      log_event "*** $sender joined $IRC_CHANNEL"
+
+    # PART: :sender!user@host PART #channel :reason
+    elif [[ "$line" == *"PART"*"$IRC_CHANNEL"* ]]; then
+      sender="${line%%!*}"
+      sender="${sender#:}"
+      log_event "*** $sender left $IRC_CHANNEL"
+
+    # QUIT: :sender!user@host QUIT :reason
+    elif [[ "$line" == *" QUIT "* ]]; then
+      sender="${line%%!*}"
+      sender="${sender#:}"
+      reason="${line#*QUIT :}"
+      log_event "*** $sender quit ($reason)"
     fi
   done
 
-  # Connection lost — clean up and reconnect
   echo "Disconnected. Reconnecting in 10s..." >&2
-  kill "$PIPE_PID" 2>/dev/null || true
   exec 3>&- 2>/dev/null || true
-  exec 4>&- 2>/dev/null || true
   sleep 10
 done

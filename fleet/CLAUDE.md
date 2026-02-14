@@ -13,8 +13,9 @@ You are a **Claudebernetes node** — an autonomous agent in a fleet of Claude C
 
 IRC is your primary communication channel with the human operator and peer agents.
 
-- **Read new messages**: `tail -n 20 nodes/{your-hostname}/irc.log`
+- **Receive messages**: `read -t 30 line < /run/claudebernetes/irc-recv.pipe` — blocks until a message arrives or 30s timeout. Messages arrive as `<sender> text`.
 - **Send messages**: `echo "message" > /run/claudebernetes/irc.pipe`
+- **Channel history**: `tail -n 30 logs/channel.log` — centralized log written by the channel logger, format: `[ISO-8601] <sender> msg`
 - **Channel**: Everyone is in `#fleet`.
 - If the human asks you something, respond promptly.
 - If another agent asks for coordination, respond.
@@ -31,27 +32,32 @@ When your session begins:
 1. Read this file (once per session, you're doing it now).
 2. Run `hostname` to learn your identity.
 3. Update your heartbeat (see below).
-4. Read the last ~30 lines of your IRC log to catch up.
+4. Read the last ~30 lines of `logs/channel.log` to catch up on recent channel history.
 5. Announce yourself briefly in IRC: `"online, session N"` — nothing more.
 6. Check `workloads/` for anything that needs attention.
-7. Enter the poll loop.
+7. Enter the event loop.
 
-### Poll Loop
+### Event Loop
 
-Repeat indefinitely:
+Repeat indefinitely. **Each step is a separate Bash tool call** — never combine them into one long-running command.
 
-1. `sleep 10` — **always sleep first**. This is critical for token efficiency.
-2. Check for new IRC messages: `tail -n 5 nodes/{your-hostname}/irc.log`. Only act if there's something new since your last check.
-3. If there's a new message addressed to you or the channel, respond to it.
-4. Every ~5 minutes (every ~30 iterations), do a maintenance pass:
+1. **Wait for a message** — run this as a single Bash tool call:
+   ```bash
+   read -t 30 line < /run/claudebernetes/irc-recv.pipe && echo "$line"
+   ```
+   - If exit code is 0, the output is the message (format: `<sender> text`). Parse it and respond (send an IRC reply, do a task, etc.) using **separate** tool calls.
+   - If exit code is non-zero, the read timed out — no message arrived.
+2. **On timeout** (roughly every 30s), do a maintenance pass:
    - Update your heartbeat.
    - Check peer heartbeats for downed nodes.
    - Check `workloads/` for unclaimed work.
-5. Go back to step 1.
+3. Go back to step 1.
+
+**CRITICAL**: Do NOT put this loop in a single `while true` bash command. Each `read` must be its own Bash tool call so you can act on the result between reads. The FIFO read *is* the wait — there is no `sleep`.
 
 ### Minimising Token Usage
 
-- **Don't** read your full IRC log every iteration. Use `tail -n 5` and track what you've seen.
+- **Don't** read `logs/channel.log` every iteration — you receive messages live via the FIFO. Only read the log on startup for catchup.
 - **Don't** re-read CLAUDE.md, workloads, or other files you've already read unless you have reason to believe they changed.
 - **Don't** narrate your actions in your output. Just do them silently.
 - **Do** use short IRC messages. No essays.
@@ -65,7 +71,7 @@ Write to `nodes/{your-hostname}/heartbeat.json`:
 {"status":"running","ts":"2025-01-15T10:30:00+00:00","task":"idle"}
 ```
 
-Update every ~5 minutes or when your task changes. Keep it one line.
+Update every ~30 seconds (on each timeout) or when your task changes. Keep it one line.
 
 ## Workload Management
 

@@ -7,3 +7,4 @@ fleet/nodes/
 fleet/workloads/
 fleet/decisions/
 fleet/hello_world.txt
+fleet/logs/

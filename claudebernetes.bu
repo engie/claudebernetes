@@ -70,6 +70,7 @@ systemd:
           cp /var/mnt/fleet/auth/settings.json /var/mnt/fleet/nodes/%H/.claude/settings.json && \
           mkdir -p /run/claudebernetes && \
           mkfifo /run/claudebernetes/irc.pipe && \
+          mkfifo /run/claudebernetes/irc-recv.pipe && \
           echo "{\"status\":\"booted\",\"ts\":\"$(date -Iseconds)\"}" > /var/mnt/fleet/nodes/%H/heartbeat.json'
 
         [Install]

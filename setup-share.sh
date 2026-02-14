@@ -13,6 +13,7 @@ mkdir -p "$FLEET_DIR/auth"
 mkdir -p "$FLEET_DIR/nodes"
 mkdir -p "$FLEET_DIR/workloads"
 mkdir -p "$FLEET_DIR/decisions"
+mkdir -p "$FLEET_DIR/logs"
 
 # Copy Claude binary
 CLAUDE_SRC="$HOME/.local/share/claude/versions/2.1.39"
@@ -57,6 +58,7 @@ echo "Wrote settings.json"
 # Copy agent-wrapper.sh and irc-bot.sh (already created in fleet/bin/)
 chmod 755 "$FLEET_DIR/bin/agent-wrapper.sh"
 chmod 755 "$FLEET_DIR/bin/irc-bot.sh"
+chmod 755 "$FLEET_DIR/bin/irc-logger.sh"
 echo "Set script permissions"
 
 echo ""
